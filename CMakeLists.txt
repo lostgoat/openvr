@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 
 # Set project name.
 project(OpenVRSDK)
+set(OPENVR_VERSION "1.1.3b")
 
 # Setup some options.
 option(BUILD_SHARED "Builds the library as shared library" OFF)

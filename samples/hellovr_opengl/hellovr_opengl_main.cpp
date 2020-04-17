@@ -227,8 +227,15 @@ private: // OpenGL bookkeeping
 		GLuint m_nResolveTextureId;
 		GLuint m_nResolveFramebufferId;
 	};
-	FramebufferDesc leftEyeDesc;
-	FramebufferDesc rightEyeDesc;
+
+	static constexpr uint32_t NUM_FRAMEBUFFERS = 9;
+
+	FramebufferDesc& GetLeftEyeDesc() { return leftEyeDesc[m_unFramebufferIdx]; }
+	FramebufferDesc& GetRightEyeDesc() { return rightEyeDesc[m_unFramebufferIdx]; }
+
+	uint32_t m_unFramebufferIdx = 0;
+	FramebufferDesc leftEyeDesc[NUM_FRAMEBUFFERS];
+	FramebufferDesc rightEyeDesc[NUM_FRAMEBUFFERS];
 
 	bool CreateFrameBuffer( int nWidth, int nHeight, FramebufferDesc &framebufferDesc );
 	
@@ -655,17 +662,17 @@ void CMainApplication::Shutdown()
 			glDeleteProgram( m_unCompanionWindowProgramID );
 		}
 
-		glDeleteRenderbuffers( 1, &leftEyeDesc.m_nDepthBufferId );
-		glDeleteTextures( 1, &leftEyeDesc.m_nRenderTextureId );
-		glDeleteFramebuffers( 1, &leftEyeDesc.m_nRenderFramebufferId );
-		glDeleteTextures( 1, &leftEyeDesc.m_nResolveTextureId );
-		glDeleteFramebuffers( 1, &leftEyeDesc.m_nResolveFramebufferId );
+		glDeleteRenderbuffers( 1, &GetLeftEyeDesc().m_nDepthBufferId );
+		glDeleteTextures( 1, &GetLeftEyeDesc().m_nRenderTextureId );
+		glDeleteFramebuffers( 1, &GetLeftEyeDesc().m_nRenderFramebufferId );
+		glDeleteTextures( 1, &GetLeftEyeDesc().m_nResolveTextureId );
+		glDeleteFramebuffers( 1, &GetLeftEyeDesc().m_nResolveFramebufferId );
 
-		glDeleteRenderbuffers( 1, &rightEyeDesc.m_nDepthBufferId );
-		glDeleteTextures( 1, &rightEyeDesc.m_nRenderTextureId );
-		glDeleteFramebuffers( 1, &rightEyeDesc.m_nRenderFramebufferId );
-		glDeleteTextures( 1, &rightEyeDesc.m_nResolveTextureId );
-		glDeleteFramebuffers( 1, &rightEyeDesc.m_nResolveFramebufferId );
+		glDeleteRenderbuffers( 1, &GetRightEyeDesc().m_nDepthBufferId );
+		glDeleteTextures( 1, &GetRightEyeDesc().m_nRenderTextureId );
+		glDeleteFramebuffers( 1, &GetRightEyeDesc().m_nRenderFramebufferId );
+		glDeleteTextures( 1, &GetRightEyeDesc().m_nResolveTextureId );
+		glDeleteFramebuffers( 1, &GetRightEyeDesc().m_nResolveFramebufferId );
 
 		if( m_unCompanionWindowVAO != 0 )
 		{
@@ -849,13 +856,15 @@ void CMainApplication::RenderFrame()
 	// for now as fast as possible
 	if ( m_pHMD )
 	{
+		m_unFramebufferIdx = (m_unFramebufferIdx+1) % NUM_FRAMEBUFFERS;
+
 		RenderControllerAxes();
 		RenderStereoTargets();
 		RenderCompanionWindow();
 
-		vr::Texture_t leftEyeTexture = {(void*)(uintptr_t)leftEyeDesc.m_nResolveTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
+		vr::Texture_t leftEyeTexture = {(void*)(uintptr_t)GetLeftEyeDesc().m_nResolveTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::Eye_Left, &leftEyeTexture );
-		vr::Texture_t rightEyeTexture = {(void*)(uintptr_t)rightEyeDesc.m_nResolveTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
+		vr::Texture_t rightEyeTexture = {(void*)(uintptr_t)GetRightEyeDesc().m_nResolveTextureId, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::Eye_Right, &rightEyeTexture );
 	}
 
@@ -1424,8 +1433,11 @@ bool CMainApplication::SetupStereoRenderTargets()
 
 	m_pHMD->GetRecommendedRenderTargetSize( &m_nRenderWidth, &m_nRenderHeight );
 
-	CreateFrameBuffer( m_nRenderWidth, m_nRenderHeight, leftEyeDesc );
-	CreateFrameBuffer( m_nRenderWidth, m_nRenderHeight, rightEyeDesc );
+	for ( uint32_t i = 0; i < NUM_FRAMEBUFFERS; ++i )
+	{
+		CreateFrameBuffer( m_nRenderWidth, m_nRenderHeight, leftEyeDesc[i] );
+		CreateFrameBuffer( m_nRenderWidth, m_nRenderHeight, rightEyeDesc[i] );
+	}
 	
 	return true;
 }
@@ -1492,15 +1504,15 @@ void CMainApplication::RenderStereoTargets()
 	glEnable( GL_MULTISAMPLE );
 
 	// Left Eye
-	glBindFramebuffer( GL_FRAMEBUFFER, leftEyeDesc.m_nRenderFramebufferId );
+	glBindFramebuffer( GL_FRAMEBUFFER, GetLeftEyeDesc().m_nRenderFramebufferId );
  	glViewport(0, 0, m_nRenderWidth, m_nRenderHeight );
  	RenderScene( vr::Eye_Left );
  	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 	
 	glDisable( GL_MULTISAMPLE );
 	 	
- 	glBindFramebuffer(GL_READ_FRAMEBUFFER, leftEyeDesc.m_nRenderFramebufferId);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, leftEyeDesc.m_nResolveFramebufferId );
+ 	glBindFramebuffer(GL_READ_FRAMEBUFFER, GetLeftEyeDesc().m_nRenderFramebufferId);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GetLeftEyeDesc().m_nResolveFramebufferId );
 
     glBlitFramebuffer( 0, 0, m_nRenderWidth, m_nRenderHeight, 0, 0, m_nRenderWidth, m_nRenderHeight, 
 		GL_COLOR_BUFFER_BIT,
@@ -1512,15 +1524,15 @@ void CMainApplication::RenderStereoTargets()
 	glEnable( GL_MULTISAMPLE );
 
 	// Right Eye
-	glBindFramebuffer( GL_FRAMEBUFFER, rightEyeDesc.m_nRenderFramebufferId );
+	glBindFramebuffer( GL_FRAMEBUFFER, GetRightEyeDesc().m_nRenderFramebufferId );
  	glViewport(0, 0, m_nRenderWidth, m_nRenderHeight );
  	RenderScene( vr::Eye_Right );
  	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
  	
 	glDisable( GL_MULTISAMPLE );
 
- 	glBindFramebuffer(GL_READ_FRAMEBUFFER, rightEyeDesc.m_nRenderFramebufferId );
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rightEyeDesc.m_nResolveFramebufferId );
+ 	glBindFramebuffer(GL_READ_FRAMEBUFFER, GetRightEyeDesc().m_nRenderFramebufferId );
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GetRightEyeDesc().m_nResolveFramebufferId );
 	
     glBlitFramebuffer( 0, 0, m_nRenderWidth, m_nRenderHeight, 0, 0, m_nRenderWidth, m_nRenderHeight, 
 		GL_COLOR_BUFFER_BIT,
@@ -1592,7 +1604,7 @@ void CMainApplication::RenderCompanionWindow()
 	glUseProgram( m_unCompanionWindowProgramID );
 
 	// render left eye (first half of index array )
-	glBindTexture(GL_TEXTURE_2D, leftEyeDesc.m_nResolveTextureId );
+	glBindTexture(GL_TEXTURE_2D, GetLeftEyeDesc().m_nResolveTextureId );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -1600,7 +1612,7 @@ void CMainApplication::RenderCompanionWindow()
 	glDrawElements( GL_TRIANGLES, m_uiCompanionWindowIndexSize/2, GL_UNSIGNED_SHORT, 0 );
 
 	// render right eye (second half of index array )
-	glBindTexture(GL_TEXTURE_2D, rightEyeDesc.m_nResolveTextureId  );
+	glBindTexture(GL_TEXTURE_2D, GetRightEyeDesc().m_nResolveTextureId  );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
